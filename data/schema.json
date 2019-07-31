@@ -15,6 +15,11 @@
           "default": "",
           "description": "Working directory of languageserver, absolute path or relative to workspace folder, use workspace root by default"
         },
+        "disableDynamicRegister": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disable dynamic registerCapability feature for this languageserver to avoid duplicated feature regstration."
+        },
         "disableWorkspaceFolders": {
           "type": "boolean",
           "default": false,
@@ -116,10 +121,11 @@
           "default": "127.0.0.1",
           "description": "Host of server"
         },
+        "disableWorkspaceFolders": {},
+        "disableDynamicRegister": {},
         "disableDiagnostics": {},
         "disableCompletion": {},
         "enable": {},
-        "disableWorkspaceFolders": {},
         "rootPatterns": {},
         "requireRootPattern": {},
         "ignoredRootPaths": {},
@@ -177,6 +183,7 @@
         "cwd": {},
         "env": {},
         "enable": {},
+        "disableDynamicRegister": {},
         "disableWorkspaceFolders": {},
         "disableDiagnostics": {},
         "disableCompletion": {},
@@ -224,6 +231,7 @@
         "cwd": {},
         "env": {},
         "enable": {},
+        "disableDynamicRegister": {},
         "disableWorkspaceFolders": {},
         "disableDiagnostics": {},
         "disableCompletion": {},
@@ -254,6 +262,11 @@
       "type": "string",
       "default": "npm",
       "description": "Command or absolute path to npm or yarn."
+    },
+    "suggest.enablePreselect": {
+      "type": "boolean",
+      "description": "Enable preselect feature, only works on neovim",
+      "default": true
     },
     "suggest.maxPreviewWidth": {
       "type": "number",
@@ -329,7 +342,7 @@
     },
     "suggest.preferCompleteThanJumpPlaceholder": {
       "type": "boolean",
-      "description": "Confirm completion instead of jump to next placeholder when completion is activted.",
+      "description": "Confirm completion instead of jump to next placeholder when completion is activated.",
       "default": false
     },
     "suggest.fixInsertedWord": {
@@ -545,6 +558,13 @@
       "description": "Maximum height of diagnostics floating window.",
       "default": 8
     },
+    "diagnostic.filetypeMap": {
+      "type": "object",
+      "description": "A map between buffer filetype and the filetype assigned to diagnostics. To syntax highlight diagnostics withs their parent buffer type use '\"default\": \"bufferType\"'",
+      "default": {
+        "default": ""
+      }
+    },
     "signature.enable": {
       "type": "boolean",
       "description": "Enable signature help when trigger character typed, require restart service on change.",
@@ -684,6 +704,29 @@
       "type": "object",
       "default": {},
       "description": "Custom keymappings on insert mode."
+    },
+    "list.source.outline.ctagsFilestypes": {
+      "type": "array",
+      "default": [],
+      "description": "Filetypes that should use ctags for outline instead of language server.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cursors.cancelKey": {
+      "type": "string",
+      "default": "<esc>",
+      "description": "Key used for cancel cursors session."
+    },
+    "cursors.nextKey": {
+      "type": "string",
+      "default": "<C-n>",
+      "description": "Key used for jump to next cursors position. "
+    },
+    "cursors.previousKey": {
+      "type": "string",
+      "default": "<C-p>",
+      "description": "Key used for jump to previous cursors position."
     },
     "coc.preferences.useQuickfixForLocations": {
       "type": "boolean",
@@ -870,14 +913,6 @@
       "type": "array",
       "default": [],
       "description": "Ignore patterns of matcher",
-      "items": {
-        "type": "string"
-      }
-    },
-    "list.source.outline.ctagsFilestypes": {
-      "type": "array",
-      "default": [],
-      "description": "Filetypes that should use ctags for outline instead of language server.",
       "items": {
         "type": "string"
       }

@@ -1,8 +1,6 @@
 import { NeovimClient as Neovim } from '@chemzqm/neovim'
 import { EventEmitter } from 'events'
-import https from 'https'
-import semver from 'semver'
-import { Location, CodeActionKind } from 'vscode-languageserver-types'
+import { CodeActionKind, Location } from 'vscode-languageserver-types'
 import commandManager from './commands'
 import completion from './completion'
 import diagnosticManager from './diagnostic/manager'
@@ -13,26 +11,34 @@ import services from './services'
 import snippetManager from './snippets/manager'
 import sources from './sources'
 import { Autocmd, OutputChannel, PatternType } from './types'
+import Cursors from './cursors'
 import clean from './util/clean'
 import workspace from './workspace'
-import debounce = require('debounce')
 const logger = require('./util/logger')('plugin')
 
 export default class Plugin extends EventEmitter {
   private _ready = false
   private handler: Handler
   private infoChannel: OutputChannel
+  private cursors: Cursors
 
   constructor(public nvim: Neovim) {
     super()
     Object.defineProperty(workspace, 'nvim', {
       get: () => this.nvim
     })
+    this.cursors = new Cursors(nvim)
     this.addMethod('hasSelected', () => {
       return completion.hasSelected()
     })
     this.addMethod('listNames', () => {
       return listManager.names
+    })
+    this.addMethod('search', (...args: string[]) => {
+      return this.handler.search(args)
+    })
+    this.addMethod('cursorsSelect', (bufnr: number, kind: string, mode: string) => {
+      return this.cursors.select(bufnr, kind, mode)
     })
     this.addMethod('codeActionRange', (start, end, only) => {
       return this.handler.codeActionRange(start, end, only)
@@ -89,7 +95,14 @@ export default class Plugin extends EventEmitter {
     })
     this.addMethod('doAutocmd', async (id: number, ...args: []) => {
       let autocmd = (workspace as any).autocmds.get(id) as Autocmd
-      if (autocmd) await Promise.resolve(autocmd.callback.apply(autocmd.thisArg, args))
+      if (autocmd) {
+        try {
+          await Promise.resolve(autocmd.callback.apply(autocmd.thisArg, args))
+        } catch (e) {
+          logger.error(`Error on autocmd ${autocmd.event}`, e)
+          workspace.showMessage(`Error on autocmd ${autocmd.event}: ${e.message}`)
+        }
+      }
     })
     this.addMethod('updateConfig', (section: string, val: any) => {
       workspace.configurations.updateUserConfig({ [section]: val })
@@ -132,9 +145,7 @@ export default class Plugin extends EventEmitter {
   }
 
   private addMethod(name: string, fn: Function): any {
-    Object.defineProperty(this, name, {
-      value: fn
-    })
+    Object.defineProperty(this, name, { value: fn })
   }
 
   public addCommand(cmd: { id: string, cmd: string, title?: string }): void {
@@ -148,20 +159,20 @@ export default class Plugin extends EventEmitter {
   public async init(): Promise<void> {
     let { nvim } = this
     try {
-      await extensions.init(nvim)
+      await extensions.init()
       await workspace.init()
+      completion.init()
       diagnosticManager.init()
       listManager.init(nvim)
       nvim.setVar('coc_workspace_initialized', 1, true)
       nvim.setVar('coc_process_pid', process.pid, true)
       nvim.setVar('WorkspaceFolders', workspace.folderPaths, true)
-      completion.init(nvim)
       sources.init()
       this.handler = new Handler(nvim)
       services.init()
       await extensions.activateExtensions()
       nvim.setVar('coc_service_initialized', 1, true)
-      nvim.call('coc#_init', [], true)
+      nvim.call('coc#util#do_autocmd', ['CocNvimInit'], true)
       this._ready = true
       let cmds = await nvim.getVar('coc_vim_commands') as any[]
       if (cmds && cmds.length) {
@@ -394,6 +405,10 @@ export default class Plugin extends EventEmitter {
           return await extensions.uninstallExtension(args.slice(1))
         case 'getCurrentFunctionSymbol':
           return await handler.getCurrentFunctionSymbol()
+        case 'getWordEdit':
+          return await handler.getWordEdit()
+        case 'addRanges':
+          return await this.cursors.addRanges(args[1])
         default:
           workspace.showMessage(`unknown action ${args[0]}`, 'error')
       }

@@ -88,6 +88,8 @@ export class ListManager implements Disposable {
     this.ui.onDidChangeLine(debounce(async () => {
       if (!this.activated) return
       let previewing = await nvim.call('coc#util#has_preview')
+      let mode = await this.nvim.mode
+      if (mode.blocking || mode.mode != 'n') return
       if (previewing) await this.doAction('preview')
     }, 100), null, this.disposables)
     this.ui.onDidLineChange(debounce(async () => {
@@ -156,7 +158,7 @@ export class ListManager implements Disposable {
       this.listArgs = listArgs
       this.cwd = workspace.cwd
       await this.getCharMap()
-      await this.history.load()
+      this.history.load()
       this.window = await this.nvim.window
       this.savedHeight = await this.window.height
       this.prompt.start(options)
@@ -527,7 +529,7 @@ export class ListManager implements Disposable {
     if (list.detail) {
       highligher.addLine('DESCRIPTION', 'Label')
       let lines = list.detail.split('\n').map(s => '  ' + s)
-      highligher.addLine(lines + '\n')
+      highligher.addLine(lines.join('\n') + '\n')
     }
     if (hasOptions) {
       highligher.addLine('ARGUMENTS', 'Label')
@@ -535,6 +537,7 @@ export class ListManager implements Disposable {
       for (let opt of list.options) {
         highligher.addLine(opt.name, 'Special')
         highligher.addLine(`  ${opt.description}`)
+        highligher.addLine('')
       }
       highligher.addLine('')
     }

@@ -75,7 +75,7 @@ Below are the reasons that led coc.nvim to build its own engine:
 
 - [Installation](https://github.com/neoclide/coc.nvim/wiki/Install-coc.nvim)
 
-  Install [nodejs](https://nodejs.org/en/download/):
+  Install [nodejs](https://nodejs.org/en/download/) when necessary:
 
   ```sh
   curl -sL install-node.now.sh/lts | bash
@@ -86,8 +86,9 @@ Below are the reasons that led coc.nvim to build its own engine:
   ```vim
   " Use release branch
   Plug 'neoclide/coc.nvim', {'branch': 'release'}
-  " Or build from source code
-  " Install yarn from https://yarnpkg.com
+  " Or latest tag
+  Plug 'neoclide/coc.nvim', {'tag': '*', 'branch': 'release'}
+  " Or build from source code by use yarn: https://yarnpkg.com
   Plug 'neoclide/coc.nvim', {'do': 'yarn install --frozen-lockfile'}
   ```
 
@@ -115,6 +116,8 @@ Below are the reasons that led coc.nvim to build its own engine:
 - [Using configuration file](https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file)
 
 - [Using workspaceFolders](https://github.com/neoclide/coc.nvim/wiki/Using-workspaceFolders)
+
+- [Using multiple cursors](https://github.com/neoclide/coc.nvim/wiki/Multiple-cursors-support)
 
 - [Language servers](https://github.com/neoclide/coc.nvim/wiki/Language-servers)
 
@@ -164,7 +167,6 @@ For other completion sources, check out:
 - [coc-vimtex](https://github.com/neoclide/coc-vimtex): vimtex integration.
 - [coc-neoinclude](https://github.com/jsfaint/coc-neoinclude): neoinclude
   integration.
-- [coc-powershell](https://github.com/yatli/coc-powershell): PowerShellEditorService integration.
 - [coc-lbdbq](https://github.com/zidhuss/coc-lbdbq): email address completion.
 - [coc-browser](https://github.com/voldikss/coc-browser): web browser words completion.
 
@@ -181,6 +183,7 @@ Extensions are more powerful than a configured language server. Check out
 - **[coc-html](https://github.com/neoclide/coc-html)** for `html`, `handlebars`
   and `razor`.
 - **[coc-css](https://github.com/neoclide/coc-css)** for `css`, `scss` and `less`.
+- **[coc-ember](https://github.com/NullVoxPopuli/coc-ember)** for ember projects.
 - **[coc-vetur](https://github.com/neoclide/coc-vetur)** for `vue`, use [vetur](https://github.com/vuejs/vetur).
 - **[coc-phpls](https://github.com/marlonfan/coc-phpls)** for `php`, use [intelephense-docs](https://github.com/bmewburn/intelephense-docs).
 - **[coc-java](https://github.com/neoclide/coc-java)** for `java`, use [eclipse.jdt.ls](https://github.com/eclipse/eclipse.jdt.ls).
@@ -209,6 +212,10 @@ Extensions are more powerful than a configured language server. Check out
 - **[coc-xml](https://github.com/fannheyward/coc-xml)** for `xml`, use [lsp4xml](https://github.com/angelozerr/lsp4xml).
 - **[coc-elixir](https://github.com/amiralies/coc-elixir)** for `elixir`, based on [elixir-ls](https://github.com/JakeBecker/elixir-ls/).
 - **[coc-tabnine](https://github.com/neoclide/coc-tabnine)** for [tabnine](https://tabnine.com/).
+- **[coc-powershell](https://github.com/yatli/coc-powershell)** for PowerShellEditorService integration.
+- **[coc-omnisharp](https://github.com/yatli/coc-omnisharp)** for `csharp` and `visualbasic`.
+- **[coc-texlab](https://github.com/fannheyward/coc-texlab)** for `LaTex` using [TexLab](https://texlab.netlify.com/).
+- **[coc-lsp-wl](https://github.com/voldikss/coc-lsp-wl)** for `wolfram mathematica`, fork of [vscode-lsp-wl](https://github.com/kenkangxgwe/vscode-lsp-wl).
 
 Plus more! To get a full list of coc extensions, [search coc.nvim on npm](https://www.npmjs.com/search?q=keywords%3Acoc.nvim),
 or use [coc-marketplace](https://github.com/fannheyward/coc-marketplace), which can search and install extensions in coc.nvim directly.

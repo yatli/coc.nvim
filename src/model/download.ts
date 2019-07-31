@@ -1,6 +1,6 @@
 import { http, https } from 'follow-redirects'
 import fs from 'fs'
-import { RequestOptions } from 'http'
+import { RequestOptions, ServerResponse } from 'http'
 import mkdirp from 'mkdirp'
 import path from 'path'
 import tar from 'tar'
@@ -10,6 +10,9 @@ import { getAgent } from './fetch'
 
 /**
  * Download and extract tgz from url
+ *
+ * @param {string} url
+ * @param {DownloadOptions} options contains dest folder and optional onProgress callback
  */
 export default function download(url: string, options: DownloadOptions): Promise<void> {
   let { dest, onProgress } = options
@@ -28,18 +31,17 @@ export default function download(url: string, options: DownloadOptions): Promise
     protocol: url.startsWith('https') ? 'https:' : 'http:',
     agent,
     headers: {
-      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)',
-      'Accept-Encoding': 'gzip'
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)'
     }
   }, options)
   return new Promise<void>((resolve, reject) => {
-    const req = mod.request(opts, res => {
+    const req = mod.request(opts, (res: ServerResponse) => {
       if (res.statusCode != 200) {
         reject(new Error(`Invalid response from ${url}: ${res.statusCode}`))
         return
       }
       if (onProgress) {
-        const len = parseInt(res.headers['content-length'], 10)
+        const len = parseInt((res as any).headers['content-length'], 10)
         let cur = 0
         if (!isNaN(len)) {
           res.on('data', chunk => {
@@ -48,10 +50,11 @@ export default function download(url: string, options: DownloadOptions): Promise
           })
         }
       }
-      res.pipe(tar.x({ strip: 1, C: dest }))
-      res.on('end', () => {
-        setTimeout(resolve, 50)
+      let stream = res.pipe(tar.x({ strip: 1, C: dest }))
+      stream.on('finish', () => {
+        setTimeout(resolve, 100)
       })
+      stream.on('error', reject)
     })
     req.on('error', reject)
     req.end()

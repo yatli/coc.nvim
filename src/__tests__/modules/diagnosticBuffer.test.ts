@@ -28,12 +28,15 @@ const config: DiagnosticConfig = {
   warningSign: '>>',
   infoSign: '>>',
   refreshAfterSave: false,
-  hintSign: '>>'
+  hintSign: '>>',
+  filetypeMap: {
+    default: ''
+  },
 }
 
 async function createDiagnosticBuffer(): Promise<DiagnosticBuffer> {
   let doc = await helper.createDocument()
-  return new DiagnosticBuffer(doc, config)
+  return new DiagnosticBuffer(doc.bufnr, config)
 }
 
 function createDiagnostic(msg: string, range?: Range, severity?: DiagnosticSeverity): Diagnostic {
@@ -97,7 +100,7 @@ describe('diagnostic buffer', () => {
       createDiagnostic('bar', r, DiagnosticSeverity.Information)
     ]
     let buf = await createDiagnosticBuffer()
-    buf.setDiagnosticInfo(diagnostics)
+    buf.setDiagnosticInfo(buf.bufnr, diagnostics)
     let buffer = await nvim.buffer
     let res = await buffer.getVar('coc_diagnostic_info')
     expect(res).toEqual({
@@ -130,8 +133,8 @@ describe('diagnostic buffer', () => {
     expect(line).toBeUndefined()
     await helper.wait(50)
     let buffer = await nvim.buffer
-    let res = await buffer.getVar('coc_diagnostic_info')
-    expect(res).toBeNull()
+    let res = await buffer.getVar("coc_diagnostic_info")
+    expect(res).toEqual({ error: 0, hint: 0, information: 0, warning: 0 })
     let { matchIds } = buf as any
     expect(matchIds.size).toBe(0)
   })

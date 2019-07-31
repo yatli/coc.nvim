@@ -1,6 +1,6 @@
-import { byteLength } from '../util/string'
+import { Buffer } from '@chemzqm/neovim'
 import { parseAnsiHighlights } from '../util/ansiparse'
-import { Buffer, Neovim } from '@chemzqm/neovim'
+import { byteLength } from '../util/string'
 
 export interface HighlightItem {
   // all zero indexed
@@ -82,9 +82,13 @@ export default class Highlighter {
     return this.lines.length
   }
 
+  public getline(line: number): string {
+    return this.lines[line] || ''
+  }
+
   // default to replace
   public render(buffer: Buffer, start = 0, end = -1): void {
-    buffer.setLines(this.lines, { start, end, strictIndexing: false })
+    buffer.setLines(this.lines, { start, end, strictIndexing: false }, true)
     for (let item of this.highlights) {
       buffer.addHighlight({
         hlGroup: item.hlGroup,

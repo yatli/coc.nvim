@@ -38,7 +38,7 @@ List 						|coc-list|
 Statusline support      			|coc-status|
   Manual                			|coc-status-manual|
   Airline 					|coc-status-airline|
-  Lightline  					|coc-stauts-lightline|
+  Lightline  					|coc-status-lightline|
 FAQ						|coc-faq|
 Changelog					|coc-changelog|
 
@@ -118,6 +118,10 @@ Builtin configurations:~
 
 	 default: `true`
 
+"suggest.enablePreselect":~
+
+	Enable preselect feature on neovim, default: `true`
+
 "suggest.maxPreviewWidth":~
 
 	Maximum width of floating preview window.,  default: `80`
@@ -128,7 +132,7 @@ Builtin configurations:~
 
 "suggest.enablePreview":~
 
-	Add preview option to `completeopt`, default: false,  default: `false`
+	Add preview option to `completeopt`, default: `false`
 
 "suggest.floatEnable"~
 
@@ -181,7 +185,7 @@ Builtin configurations:~
 "suggest.preferCompleteThanJumpPlaceholder":~
 
 	Confirm completion instead of jump to next placeholder when completion
-	is activted.,  default: `false`
+	is activated.,  default: `false`
 
 "suggest.fixInsertedWord":~
 
@@ -563,6 +567,11 @@ Builtin configurations:~
 
 	Filetypes that should use `ctags` for outline instead of language
 	server.,  default: `[]`
+
+"npm.binPath":~
+
+	Command or full path of npm or yarn executable for install/update
+	extenextensions, use `npm` by default.
 
 "languageserver":~
 
@@ -980,6 +989,14 @@ g:WorkspaceFolders 				*g:WorkspaceFolders*
 			Current workspace folders, used for restoring from a 
 			session file, add `set sessionoptions+=globals` to 
 			vimrc for restoring globals.
+
+g:node_client_debug 				*g:node_client_debug*
+
+			Enable debug mode of node client on vim8, use command: >
+			
+			:call coc#client#open_log()
+<
+			to open the log file.
 
 ------------------------------------------------------------------------------
 
@@ -1485,6 +1502,15 @@ Available Actions ~
 	Do the first quickfix action for the current line.
 	Return `v:false` when no quickfix action found.
 
+"addRanges" {ranges}					*coc-action-addRanges*
+
+	Ranges must be provided as array of range type: https://git.io/fjiEG
+
+"getWordEdit" 						 *coc-action-getWordEdit*
+
+	Get workspaceEdit of current word, language server used when possible,
+	extract word from current buffer as fallback.
+
 ------------------------------------------------------------------------------
 COMMANDS 					*coc-commands*
 
@@ -1517,9 +1543,15 @@ COMMANDS 					*coc-commands*
 		{option}: could be `-sync` for use blocked process to download
 		instead of terminal.
 
-		Check out https://www.npmjs.com/search?q=keywords%3Acoc.nvim 
-		for available extensions.
+		Examples: >
 
+		" Install latest coc-omni
+		:CocInstall coc-omni
+		" Install coc-omni 1.0.0
+		:CocInstall coc-omni@1.0.0
+		" Install snippet extension from github
+		:CocInstall https://github.com/dsznajder/vscode-es7-javascript-react-snippets
+>
 :CocUninstall {name} 				*:CocUninstall*
 
 		Uninstall an extension, use <tab> to complete the extension 
@@ -1732,13 +1764,13 @@ CocHighlightText 				*CocHighlightText*
   The highlight used for document highlight feature. Normally used for
   highlighting same symbols in the buffer at the current cursor position.
 
-CocHighlightTextRead 				*CocHighlightTextRead*
+CocHighlightRead 				*CocHighlightRead*
 
   Default `hi default link CocHighlightRead  CocHighlightText`
 
   Highlight for `Read` kind of document symbol.
 
-CocHighlightTextWrite 				*CocHighlightTextWrite*
+CocHighlightWrite 				*CocHighlightWrite*
 
   Default `hi default link CocHighlightWrite  CocHighlightText`
 
@@ -1803,6 +1835,12 @@ CocHintFloat 					*CocHintFloat*
   Default: `hi default link CocHintFloat CocHintSign`
 
   The highlight used for a floating window with hints.
+
+CocCursorRange 					*CocCursorRange*
+
+  Default: `hi default link CocCursorRange Search`
+
+  The highlight used for cursor ranges.
 
 ==============================================================================
 LIST SUPPORT 					*coc-list*

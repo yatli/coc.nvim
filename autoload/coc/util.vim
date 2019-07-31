@@ -118,13 +118,12 @@ endfunction
 
 function! coc#util#close_popup()
   if s:is_vim
-    if exists('*popup_clear')
-      call popup_clear()
+    if exists('*popup_close')
+      call popup_close(get(g:, 'coc_popup_id', 0))
     endif
   else
     for winnr in range(1, winnr('$'))
-      let popup = getwinvar(winnr, 'popup')
-      if !empty(popup)
+      if getwinvar(winnr, 'popup', 0)
         exe winnr.'close!'
       endif
     endfor
@@ -141,8 +140,7 @@ function! coc#util#valid_state()
     return 0
   endif
   if get(g: , 'EasyMotion_loaded', 0)
-    let line = coc#util#echo_line()
-    return line !~# 'Target key'
+    return EasyMotion#is_active() != 1
   endif
   return 1
 endfunction
@@ -204,7 +202,7 @@ endfunction
 
 function! coc#util#execute(cmd)
   silent exe a:cmd
-  if &l:filetype ==# ''
+  if &filetype ==# ''
     filetype detect
   endif
   if s:is_vim
@@ -292,8 +290,6 @@ function! coc#util#get_bufoptions(bufnr) abort
         \ 'filetype': getbufvar(a:bufnr, '&filetype'),
         \ 'iskeyword': getbufvar(a:bufnr, '&iskeyword'),
         \ 'changedtick': getbufvar(a:bufnr, 'changedtick'),
-        \ 'rootPatterns': getbufvar(a:bufnr, 'coc_root_patterns', v:null),
-        \ 'additionalKeywords': getbufvar(a:bufnr, 'coc_additional_keywords', []),
         \}
 endfunction
 
@@ -551,6 +547,15 @@ function! coc#util#run_terminal(opts, cb)
   call coc#util#open_terminal(opts)
 endfunction
 
+function! coc#util#getpid()
+  if !has('win32unix')
+    return getpid()
+  endif
+
+  let cmd = 'cat /proc/' . getpid() . '/winpid'
+  return substitute(system(cmd), '\v\n', '', 'gi')
+endfunction
+
 function! coc#util#vim_info()
   return {
         \ 'mode': mode(),
@@ -559,7 +564,7 @@ function! coc#util#vim_info()
         \ 'watchExtensions': get(g:, 'coc_watch_extensions', []),
         \ 'globalExtensions': get(g:, 'coc_global_extensions', []),
         \ 'config': get(g:, 'coc_user_config', {}),
-        \ 'pid': getpid(),
+        \ 'pid': coc#util#getpid(),
         \ 'columns': &columns,
         \ 'lines': &lines,
         \ 'cmdheight': &cmdheight,
@@ -633,7 +638,11 @@ function! coc#util#clear_signs()
   endfor
 endfunction
 
-function! coc#util#clearmatches(ids)
+function! coc#util#clearmatches(ids, ...)
+  let winid = get(a:, 1, 0)
+  if winid != 0 && win_getid() != winid
+    return
+  endif
   for id in a:ids
     try
       call matchdelete(id)
@@ -665,29 +674,16 @@ endfunction
 
 function! coc#util#install(...) abort
   let opts = get(a:, 1, {})
-  let l:terminal = get(opts, 'terminal', 0)
-  let tag = get(opts, 'tag', 0)
-  let cmd = (s:is_win ? 'install.cmd' : './install.sh') . (tag ? '' : ' nightly')
-  function! s:OnInstalled(status, ...) closure
-    if a:status != 0 | return | endif
-    call coc#rpc#restart()
-  endfunction
-  " install.cmd would always exited with code 0 with/without errors.
-  if l:terminal
-    call coc#util#open_terminal({
-          \ 'cmd': cmd,
-          \ 'autoclose': 1,
-          \ 'cwd': s:root,
-          \ 'Callback': funcref('s:OnInstalled')
-          \})
-    wincmd p
-  else
-    let cwd = getcwd()
-    exe 'lcd '.s:root
-    exe '!'.cmd
-    exe 'lcd '.cwd
-    call s:OnInstalled(0)
+  if !isdirectory(s:root.'/src')
+    echohl WarningMsg | echon '[coc.nvim] coc#util#install not needed for release branch.' | echohl None
+    return
   endif
+  let cmd = (s:is_win ? 'install.cmd' : './install.sh') . ' nightly'
+  let cwd = getcwd()
+  exe 'lcd '.s:root
+  exe '!'.cmd
+  exe 'lcd '.cwd
+  call coc#rpc#restart()
 endfunction
 
 function! coc#util#do_complete(name, opt, cb) abort
@@ -698,6 +694,9 @@ function! coc#util#do_complete(name, opt, cb) abort
 endfunction
 
 function! coc#util#extension_root() abort
+  if !empty($COC_TEST)
+    return s:root.'/src/__tests__/extensions'
+  endif
   let dir = get(g:, 'coc_extension_root', '')
   if empty(dir)
     if s:is_win
@@ -720,7 +719,6 @@ endfunction
 
 function! coc#util#install_extension(args) abort
   let names = filter(copy(a:args), 'v:val !~# "^-"')
-  if empty(names) | return | endif
   let isRequest = index(a:args, '-sync') != -1
   if isRequest
     call coc#rpc#request('installExtensions', names)
@@ -864,4 +862,69 @@ endfunction
 function! coc#util#set_buf_var(bufnr, name, val) abort
   if !bufloaded(a:bufnr) | return | endif
   call setbufvar(a:bufnr, a:name, a:val)
+endfunction
+
+function! coc#util#change_lines(bufnr, list) abort
+  if !bufloaded(a:bufnr) | return | endif
+  let bufnr = bufnr('%')
+  let changeBuffer = bufnr != a:bufnr
+  if changeBuffer
+    exe 'buffer '.a:bufnr
+  endif
+  for [lnum, line] in a:list
+    call setline(lnum + 1, line)
+  endfor
+  if changeBuffer
+    exe 'buffer '.bufnr
+  endif
+  if s:is_vim
+    redraw
+  endif
+endfunction
+
+function! coc#util#unmap(bufnr, keys) abort
+  if bufnr('%') == a:bufnr
+    for key in a:keys
+      exe 'silent! nunmap <buffer> '.key
+    endfor
+  endif
+endfunction
+
+function! coc#util#open_files(files)
+  let bufnrs = []
+  " added on latest vim8
+  if exists('*bufadd') && exists('*bufload')
+    for file in a:files
+      let bufnr = bufadd(file)
+      call bufload(file)
+      call add(bufnrs, bufnr(file))
+    endfor
+  else
+    noa keepalt 1new +setl\ bufhidden=wipe
+    for file in a:files
+      execute 'noa edit +setl\ bufhidden=hide '.fnameescape(file)
+      if &filetype ==# ''
+        filetype detect
+      endif
+      call add(bufnrs, bufnr('%'))
+    endfor
+    noa close
+  endif
+  return bufnrs
+endfunction
+
+function! coc#util#refactor_foldlevel(lnum) abort
+  if a:lnum <= 2 | return 0 | endif
+  let line = getline(a:lnum)
+  if line =~# '^\%u3000\s*$' | return 0 | endif
+  return 1
+endfunction
+
+function! coc#util#refactor_fold_text(lnum) abort
+  let range = ''
+  let info = get(b:line_infos, a:lnum, [])
+  if !empty(info)
+    let range = info[0].':'.info[1]
+  endif
+  return trim(getline(a:lnum)[3:]).' '.range
 endfunction

@@ -1,7 +1,7 @@
 import { Neovim, Window } from '@chemzqm/neovim'
 import { RequestOptions } from 'http'
 import log4js from 'log4js'
-import { CancellationToken, CompletionTriggerKind, CreateFileOptions, DeleteFileOptions, Diagnostic, DidChangeTextDocumentParams, Disposable, DocumentSelector, Event, FormattingOptions, Location, Position, Range, RenameFileOptions, TextDocument, TextDocumentSaveReason, TextEdit, WorkspaceEdit, WorkspaceFolder } from 'vscode-languageserver-protocol'
+import { CancellationToken, CompletionTriggerKind, CreateFileOptions, DeleteFileOptions, Diagnostic, Disposable, DocumentSelector, Event, FormattingOptions, Location, Position, Range, RenameFileOptions, TextDocument, TextDocumentSaveReason, TextEdit, WorkspaceEdit, WorkspaceFolder } from 'vscode-languageserver-protocol'
 import { URI } from 'vscode-uri'
 import Configurations from './configuration'
 import { LanguageClient } from './language-client'
@@ -16,6 +16,12 @@ export type ExtensionState = 'disabled' | 'loaded' | 'activated' | 'unknown'
 export interface CodeAction extends protocol.CodeAction {
   isPrefered?: boolean
   clientId?: string
+}
+
+export interface DidChangeTextDocumentParams extends protocol.DidChangeTextDocumentParams {
+  bufnr: number
+  // original text
+  original: string
 }
 
 export interface TaskOptions {
@@ -322,6 +328,7 @@ export interface LanguageServerConfig {
   transport?: string
   transportPort?: number
   disableWorkspaceFolders?: boolean
+  disableDynamicRegister?: boolean
   disableCompletion?: boolean
   disableDiagnostics?: boolean
   filetypes: string[]
@@ -355,6 +362,7 @@ export interface LocationListItem {
 
 export interface QuickfixItem {
   uri?: string
+  module?: string
   range?: Range
   text?: string
   type?: string,
@@ -387,8 +395,6 @@ export interface BufferOption {
   filetype: string
   iskeyword: string
   changedtick: number
-  rootPatterns: string[] | null
-  additionalKeywords: string[]
 }
 
 export interface DiagnosticInfo {
@@ -567,6 +573,7 @@ export interface CompleteConfig {
   disableMenu: boolean
   disableMenuShortcut: boolean
   enablePreview: boolean
+  enablePreselect: boolean
   labelMaxLength: number
   maxPreviewWidth: number
   autoTrigger: string

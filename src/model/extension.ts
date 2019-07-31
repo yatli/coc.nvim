@@ -1,11 +1,13 @@
-import { exec, ExecOptions, spawn } from 'child_process'
+import { spawn } from 'child_process'
 import fs from 'fs'
 import mkdirp from 'mkdirp'
+import mv from 'mv'
 import path from 'path'
+import rc from 'rc'
 import rimraf from 'rimraf'
 import semver from 'semver'
+import url from 'url'
 import { promisify } from 'util'
-import { runCommand } from '../util'
 import workspace from '../workspace'
 import download from './download'
 import fetch from './fetch'
@@ -16,15 +18,11 @@ export interface Info {
   'engines.coc'?: string
   version?: string
   name?: string
-  error?: {
-    code: string
-    summary: string
-  }
 }
 
-async function getData(name: string, field: string): Promise<string> {
-  let res = await runCommand(`yarn info ${name} ${field} --json`, { timeout: 60 * 1000 })
-  return JSON.parse(res)['data']
+function registryUrl(scope = ''): string {
+  const result = rc('npm', { registry: 'https://registry.npmjs.org/' })
+  return result[`${scope}:registry`] || result.config_registry || result.registry
 }
 
 export default class ExtensionManager {
@@ -40,27 +38,29 @@ export default class ExtensionManager {
     mkdirp.sync(path.join(root, 'node_modules/.cache'))
   }
 
-  private async getInfo(npm: string, name: string): Promise<Info> {
-    if (name.startsWith('https:')) return await this.getInfoFromUri(name)
-    if (npm.endsWith('yarn')) {
-      let obj = { name }
-      let keys = ['dist.tarball', 'engines.coc', 'version', 'name']
-      let vals = await Promise.all(keys.map(key => {
-        return getData(name, key)
-      }))
-      for (let i = 0; i < keys.length; i++) {
-        obj[keys[i]] = vals[i]
-      }
-      return obj as Info
+  private async getInfo(ref: string): Promise<Info> {
+    if (ref.startsWith('https:')) return await this.getInfoFromUri(ref)
+    let name: string
+    let version: string
+    if (ref.indexOf('@') > 0) {
+      [name, version] = ref.split('@', 2)
+    } else {
+      name = ref
     }
-    let content = await safeRun(`"${npm}" view ${name} dist.tarball engines.coc version name`, { timeout: 60 * 1000 })
-    let lines = content.split(/\r?\n/)
-    let obj = { name }
-    for (let line of lines) {
-      let ms = line.match(/^(\S+)\s*=\s*'(.*)'/)
-      if (ms) obj[ms[1]] = ms[2]
+    let res = await fetch(url.resolve(registryUrl(), name)) as any
+    if (!version) version = res['dist-tags']['latest']
+    let obj = res['versions'][version]
+    if (!obj) throw new Error(`${ref} not exists.`)
+    let requiredVersion = obj['engines'] && obj['engines']['coc']
+    if (!requiredVersion) {
+      throw new Error(`${ref} is not valid coc extension, "engines" field with coc property required.`)
     }
-    return obj as Info
+    return {
+      'dist.tarball': obj['dist']['tarball'],
+      'engines.coc': requiredVersion,
+      version: obj['version'],
+      name: res.name
+    } as Info
   }
 
   private async removeFolder(folder: string): Promise<void> {
@@ -75,7 +75,11 @@ export default class ExtensionManager {
   }
 
   private async _install(npm: string, def: string, info: Info, onMessage: (msg: string) => void): Promise<void> {
-    let tmpFolder = await promisify(fs.mkdtemp)(path.join(this.root, 'node_modules/.cache', `${info.name}-`))
+    let filepath = path.join(this.root, 'node_modules/.cache', `${info.name}-`)
+    if (!fs.existsSync(path.dirname(filepath))) {
+      fs.mkdirSync(path.dirname(filepath))
+    }
+    let tmpFolder = await promisify(fs.mkdtemp)(filepath)
     let url = info['dist.tarball']
     onMessage(`Downloading from ${url}`)
     await download(url, { dest: tmpFolder })
@@ -86,8 +90,19 @@ export default class ExtensionManager {
       let p = new Promise<void>((resolve, reject) => {
         let args = ['install', '--ignore-scripts', '--no-lockfile', '--no-bin-links', '--production']
         const child = spawn(npm, args, { cwd: tmpFolder })
+        child.stderr.setEncoding('utf8')
         child.on('error', reject)
-        child.once('exit', resolve)
+        let err = ''
+        child.stderr.on('data', data => {
+          err += data
+        })
+        child.on('exit', code => {
+          if (code) {
+            // tslint:disable-next-line: no-console
+            console.error(`${npm} install exited with ${code}, messages:\n${err}`)
+          }
+          resolve()
+        })
       })
       await p
     }
@@ -103,19 +118,14 @@ export default class ExtensionManager {
     onMessage(`Moving to new folder.`)
     let folder = path.join(this.root, 'node_modules', info.name)
     await this.removeFolder(folder)
-    await promisify(fs.rename)(tmpFolder, folder)
+    await promisify(mv)(tmpFolder, folder, { mkdirp: true })
   }
 
   public async install(npm: string, def: string): Promise<string> {
     this.checkFolder()
     logger.info(`Using npm from: ${npm}`)
     logger.info(`Loading info of ${def}.`)
-    let info = await this.getInfo(npm, def)
-    if (info.error) {
-      let { code, summary } = info.error
-      let msg = code == 'E404' ? `module ${def} not exists!` : summary
-      throw new Error(msg)
-    }
+    let info = await this.getInfo(def)
     let { name } = info
     let required = info['engines.coc'] ? info['engines.coc'].replace(/^\^/, '>=') : ''
     if (required && !semver.satisfies(workspace.version, required)) {
@@ -143,8 +153,7 @@ export default class ExtensionManager {
       version = JSON.parse(content).version
     }
     logger.info(`Loading info of ${name}.`)
-    let info = await this.getInfo(npm, uri ? uri : name)
-    if (info.error) return
+    let info = await this.getInfo(uri ? uri : name)
     if (version && info.version && semver.gte(version, info.version)) {
       logger.info(`Extension ${name} is up to date.`)
       return false
@@ -172,25 +181,4 @@ export default class ExtensionManager {
       version: obj.version
     }
   }
-}
-
-function safeRun(cmd: string, opts: ExecOptions = {}, timeout?: number): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    let timer: NodeJS.Timer
-    let cp = exec(cmd, opts, (err, stdout, stderr) => {
-      if (timer) clearTimeout(timer)
-      if (err) return reject(err)
-      resolve(stdout)
-    })
-    cp.on('error', e => {
-      if (timer) clearTimeout(timer)
-      reject(e)
-    })
-    if (timeout) {
-      timer = setTimeout(() => {
-        cp.kill()
-        reject(new Error(`timeout after ${timeout}s`))
-      }, timeout * 1000)
-    }
-  })
 }
