@@ -17,6 +17,10 @@ function! CocAction(...) abort
   return coc#rpc#request('CocAction', a:000)
 endfunction
 
+function! CocHasProvider(name) abort
+  return coc#rpc#request('hasProvider', [a:name])
+endfunction
+
 function! CocActionAsync(...) abort
   return s:AsyncRequest('CocAction', a:000)
 endfunction
@@ -168,7 +172,7 @@ function! s:Enable()
 
     if coc#rpc#started()
       autocmd VimEnter            * call coc#rpc#notify('VimEnter', [])
-    else
+    elseif get(g:, 'coc_start_at_startup', 1)
       autocmd VimEnter            * call coc#rpc#start_server()
     endif
     if s:is_vim
@@ -206,7 +210,7 @@ function! s:Enable()
     autocmd BufNewFile,BufReadPost, * call s:Autocmd('BufCreate', +expand('<abuf>'))
     autocmd BufUnload           * call s:SyncAutocmd('BufUnload', +expand('<abuf>'))
     autocmd BufWritePre         * call s:SyncAutocmd('BufWritePre', +expand('<abuf>'))
-    autocmd FocusGained         * call s:Autocmd('FocusGained')
+    autocmd FocusGained         * if mode() !~# '^c' | call s:Autocmd('FocusGained') | endif
     autocmd VimResized          * call s:Autocmd('VimResized', &columns, &lines)
     autocmd VimLeavePre         * let g:coc_vim_leaving = 1
     autocmd VimLeave            * call coc#rpc#stop()
@@ -276,7 +280,11 @@ function! s:ShowInfo()
       setl filetype=nofile
       call setline(1, lines)
     else
-      echohl MoreMsg | echon 'Service stopped for some unknown reason, try :CocStart' | echohl None
+      if get(g:, 'coc_start_at_startup',1)
+        echohl MoreMsg | echon 'Start on startup is disabled, try :CocStart' | echohl None
+      else
+        echohl MoreMsg | echon 'Service stopped for some unknown reason, try :CocStart' | echohl None
+      endif
     endif
   endif
 endfunction

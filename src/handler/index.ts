@@ -1,5 +1,5 @@
 import { NeovimClient as Neovim } from '@chemzqm/neovim'
-import { CancellationTokenSource, CodeActionContext, CodeActionKind, Definition, Disposable, DocumentLink, DocumentSymbol, ExecuteCommandParams, ExecuteCommandRequest, Hover, Location, LocationLink, MarkedString, MarkupContent, Position, Range, SelectionRange, SymbolInformation, TextEdit, WorkspaceEdit, TextDocumentEdit } from 'vscode-languageserver-protocol'
+import { CancellationTokenSource, CodeActionContext, CodeActionKind, Definition, Disposable, DocumentLink, DocumentSymbol, ExecuteCommandParams, ExecuteCommandRequest, Hover, Location, LocationLink, MarkedString, MarkupContent, Position, Range, SelectionRange, SymbolInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver-protocol'
 import { Document } from '..'
 import commandManager from '../commands'
 import diagnosticManager from '../diagnostic/manager'
@@ -14,14 +14,14 @@ import { CodeAction, Documentation } from '../types'
 import { disposeAll, wait } from '../util'
 import { getSymbolKind } from '../util/convert'
 import { equals } from '../util/object'
-import { positionInRange, rangeInRange, emptyRange } from '../util/position'
+import { emptyRange, positionInRange, rangeInRange } from '../util/position'
 import { byteLength, isWord } from '../util/string'
 import workspace from '../workspace'
 import CodeLensManager from './codelens'
-import Search from './search'
 import Colors from './colors'
-import Refactor from './refactor'
 import DocumentHighlighter from './documentHighlight'
+import Refactor from './refactor'
+import Search from './search'
 import debounce = require('debounce')
 const logger = require('../util/logger')('Handler')
 const pairs: Map<string, string> = new Map([
@@ -291,6 +291,13 @@ export default class Handler {
     return functionName
   }
 
+  public async hasProvider(id: string): Promise<boolean> {
+    let bufnr = await this.nvim.call('bufnr', '%')
+    let doc = workspace.getDocument(bufnr)
+    if (!doc) return false
+    return languages.hasProvider(id, doc.textDocument)
+  }
+
   public async onHover(): Promise<boolean> {
     let { document, position } = await workspace.getCurrentState()
     let hovers = await languages.getHover(document, position)
@@ -435,37 +442,39 @@ export default class Handler {
   }
 
   public async rename(newName?: string): Promise<boolean> {
-    let edit = await this.getWordEdit()
+    let bufnr = await this.nvim.call('bufnr', '%')
+    let doc = workspace.getDocument(bufnr)
+    if (!doc) return false
     let { nvim } = this
-    if (!edit) {
-      workspace.showMessage('Invalid position for rename', 'warning')
+    let position = await workspace.getCursorPosition()
+    let range = doc.getWordRangeAtPosition(position)
+    if (!range || emptyRange(range)) return false
+    if (!languages.hasProvider('rename', doc.textDocument)) {
+      workspace.showMessage(`Rename provider not found for current document`, 'error')
+      return false
+    }
+    if (doc.dirty) {
+      doc.forceSync()
+      await wait(30)
+    }
+    let res = await languages.prepareRename(doc.textDocument, position)
+    if (res === false) {
+      workspace.showMessage('Invalid position for renmame', 'error')
       return false
     }
     if (!newName) {
       let curname = await nvim.eval('expand("<cword>")')
-      newName = await workspace.callAsync<string>('input', ['new name:', curname])
+      newName = await workspace.callAsync<string>('input', ['New name: ', curname])
       nvim.command('normal! :<C-u>', true)
       if (!newName) {
         workspace.showMessage('Empty name, canceled', 'warning')
         return false
       }
     }
-    // change to newName
-    let { changes, documentChanges } = edit
-    if (changes) {
-      for (let uri of Object.keys(changes)) {
-        for (let edit of changes[uri]) {
-          edit.newText = newName
-        }
-      }
-    } else if (documentChanges) {
-      for (let c of documentChanges) {
-        if (TextDocumentEdit.is(c)) {
-          for (let edit of c.edits) {
-            edit.newText = newName
-          }
-        }
-      }
+    let edit = await languages.provideRenameEdits(doc.textDocument, position, newName)
+    if (!edit) {
+      workspace.showMessage('Invalid position for rename', 'warning')
+      return false
     }
     await workspace.applyEdit(edit)
     return true
@@ -508,7 +517,9 @@ export default class Handler {
     if (id) {
       await events.fire('Command', [id])
       let res = await commandManager.executeCommand(id, ...args)
-      await this.nvim.command(`silent! call repeat#set("\\<Plug>(coc-command-repeat)", -1)`)
+      if (args.length == 0) {
+        await commandManager.addRecent(id)
+      }
       return res
     } else {
       await listManager.start(['commands'])

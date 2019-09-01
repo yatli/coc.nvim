@@ -43,6 +43,7 @@ export class DiagnosticManager implements Disposable {
   public config: DiagnosticConfig
   public enabled = true
   public readonly buffers: DiagnosticBuffer[] = []
+  private lastMessage = ''
   private floatFactory: FloatFactory
   private collections: DiagnosticCollection[] = []
   private disposables: Disposable[] = []
@@ -85,11 +86,11 @@ export class DiagnosticManager implements Disposable {
       }
     }, null, this.disposables)
 
-    events.on('BufEnter', async bufnr => {
+    events.on('BufEnter', async () => {
       if (this.timer) clearTimeout(this.timer)
       if (!this.enabled || !this.config.locationlist) return
-      let doc = workspace.getDocument(bufnr)
-      if (doc && doc.buftype == 'quickfix') return
+      let doc = await workspace.document
+      if (!doc || doc.buftype == 'quickfix') return
       if (this.shouldValidate(doc)) {
         let refreshed = this.refreshBuffer(doc.uri)
         if (refreshed) return
@@ -361,8 +362,7 @@ export class DiagnosticManager implements Disposable {
     return res
   }
 
-  public async getCurrentDiagnostics(): Promise<Diagnostic[]> {
-    let [bufnr, cursor] = await this.nvim.eval('[bufnr("%"),coc#util#cursor()]') as [number, [number, number]]
+  private async getDiagnosticsAt(bufnr: number, cursor: [number, number]): Promise<Diagnostic[]> {
     let pos = Position.create(cursor[0], cursor[1])
     let buffer = this.buffers.find(o => o.bufnr == bufnr)
     if (!buffer) return []
@@ -371,7 +371,13 @@ export class DiagnosticManager implements Disposable {
       if (checkCurrentLine) return lineInRange(pos.line, o.range)
       return positionInRange(pos, o.range) == 0
     })
+    diagnostics.sort((a, b) => a.severity - b.severity)
     return diagnostics
+  }
+
+  public async getCurrentDiagnostics(): Promise<Diagnostic[]> {
+    let [bufnr, cursor] = await this.nvim.eval('[bufnr("%"),coc#util#cursor()]') as [number, [number, number]]
+    return await this.getDiagnosticsAt(bufnr, cursor)
   }
 
   /**
@@ -382,20 +388,31 @@ export class DiagnosticManager implements Disposable {
     if (!this.enabled || config.enableMessage == 'never') return
     if (this.timer) clearTimeout(this.timer)
     let useFloat = config.messageTarget == 'float'
-    let diagnostics = await this.getCurrentDiagnostics()
+    let [bufnr, cursor] = await this.nvim.eval('[bufnr("%"),coc#util#cursor()]') as [number, [number, number]]
+    if (useFloat) {
+      let { buffer } = this.floatFactory
+      if (buffer && bufnr == buffer.id) return
+    }
+    let diagnostics = await this.getDiagnosticsAt(bufnr, cursor)
     if (diagnostics.length == 0) {
       if (useFloat) {
         this.floatFactory.close()
       } else {
-        await this.nvim.command('echo ""')
+        let echoLine = await this.nvim.call('coc#util#echo_line') as string
+        if (this.lastMessage && echoLine.startsWith(this.lastMessage)) {
+          this.nvim.command('echo ""', true)
+        }
       }
       return
     }
     if (truncate && workspace.insertMode) return
     let docs: Documentation[] = []
-    const filetype = await this.nvim.eval('&filetype') as string
-    const defaultFiletype = config.filetypeMap['default'] || ''
-    const ft = config.filetypeMap[filetype] || (defaultFiletype == 'bufferType' ? filetype : defaultFiletype)
+    let ft = ''
+    if (Object.keys(config.filetypeMap).length > 0) {
+      const filetype = await this.nvim.eval('&filetype') as string
+      const defaultFiletype = config.filetypeMap['default'] || ''
+      ft = config.filetypeMap[filetype] || (defaultFiletype == 'bufferType' ? filetype : defaultFiletype)
+    }
     diagnostics.forEach(diagnostic => {
       let { source, code, severity, message } = diagnostic
       let s = getSeverityName(severity)[0]
@@ -421,9 +438,12 @@ export class DiagnosticManager implements Disposable {
     if (useFloat) {
       await this.floatFactory.create(docs)
     } else {
-      await this.nvim.command('echo ""')
       let lines = docs.map(d => d.content).join('\n').split(/\r?\n/)
-      await workspace.echoLines(lines, truncate)
+      if (lines.length) {
+        await this.nvim.command('echo ""')
+        this.lastMessage = lines[0].slice(0, 30)
+        await workspace.echoLines(lines, truncate)
+      }
     }
   }
 

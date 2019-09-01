@@ -344,7 +344,9 @@ function! s:funcs.buf_set_lines(bufnr, start, end, strict, ...) abort
       endif
       if delCount
         let start = startLnum + len(replacement)
+        let saved_reg = @"
         silent execute start . ','.(start + delCount - 1).'d'
+        let @" = saved_reg
       endif
     endif
     if changeBuffer
@@ -478,7 +480,7 @@ endfunction
 
 function! s:funcs.win_get_number(win_id) abort
   let info = getwininfo(a:win_id)
-  if !info
+  if empty(info)
     throw 'Invalid window id '.a:win_id
   endif
   return info[0]['winnr']
@@ -497,6 +499,13 @@ function! s:funcs.win_set_cursor(win_id, pos) abort
       execute curr.'wincmd w'
     endif
   endif
+endfunction
+
+function! s:funcs.win_close(win_id, ...) abort
+  let curr = win_getid(a:win_id)
+  call win_gotoid(a:win_id)
+  close!
+  call win_gotoid(curr)
 endfunction
 
 function! s:funcs.win_get_tabpage(win_id) abort

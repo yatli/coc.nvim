@@ -24,7 +24,7 @@ import { TextDocumentContentProvider } from './provider'
 import { Autocmd, ConfigurationChangeEvent, ConfigurationTarget, EditerState, Env, IWorkspace, KeymapOption, LanguageServerConfig, MapMode, MessageLevel, MsgTypes, OutputChannel, PatternType, QuickfixItem, StatusBarItem, StatusItemOption, Terminal, TerminalOptions, TerminalResult, TextDocumentWillSaveEvent, WorkspaceConfiguration, DidChangeTextDocumentParams } from './types'
 import { distinct } from './util/array'
 import { findUp, isFile, isParentFolder, readFile, readFileLine, renameAsync, resolveRoot, statAsync, writeFile } from './util/fs'
-import { disposeAll, echoErr, echoMessage, echoWarning, getKeymapModifier, isDocumentEdit, mkdirp, runCommand, wait } from './util/index'
+import { disposeAll, echoErr, echoMessage, echoWarning, getKeymapModifier, isDocumentEdit, mkdirp, runCommand, wait, platform } from './util/index'
 import { score } from './util/match'
 import { getChangedFromEdits } from './util/position'
 import { byteIndex, byteLength } from './util/string'
@@ -1044,7 +1044,7 @@ export class Workspace implements IWorkspace {
    */
   public async requestInput(title: string, defaultValue?: string): Promise<string> {
     let { nvim } = this
-    let res = await this.callAsync<string>('input', [title + ':', defaultValue || ''])
+    let res = await this.callAsync<string>('input', [title + ': ', defaultValue || ''])
     nvim.command('normal! :<C-u>', true)
     if (!res) {
       this.showMessage('Empty word, canceled', 'warning')
@@ -1220,7 +1220,12 @@ augroup end`
     try {
       let filepath = path.join(os.tmpdir(), `coc-${process.pid}.vim`)
       await writeFile(filepath, content)
-      await this.nvim.command(`source ${filepath}`)
+      let cmd = `source ${filepath}`
+      const isCygwin = await this.nvim.eval('has("win32unix")')
+      if (isCygwin && platform.isWindows) {
+        cmd = `execute "source" . substitute(system('cygpath ${filepath.replace(/\\/g, '/')}'), '\\n', '', 'g')`
+      }
+      await this.nvim.command(cmd)
     } catch (e) {
       this.showMessage(`Can't create tmp file: ${e.message}`, 'error')
     }
@@ -1339,7 +1344,7 @@ augroup end`
     } catch (e) {
       logger.error('Error on create buffer:', e)
     }
-    if (!document) return
+    if (!document || !document.textDocument) return
     this.buffers.set(bufnr, document)
     document.onDocumentDetach(uri => {
       let doc = this.getDocument(uri)
@@ -1479,7 +1484,7 @@ augroup end`
       return
     }
     let oldPath = URI.parse(doc.uri).fsPath
-    let newPath = await nvim.call('input', ['new path:', oldPath, 'file'])
+    let newPath = await nvim.call('input', ['New path: ', oldPath, 'file'])
     newPath = newPath ? newPath.trim() : null
     if (newPath == oldPath || !newPath) return
     let lines = await doc.buffer.lines

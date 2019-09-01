@@ -868,6 +868,21 @@ g:coc_global_extensions 			*g:coc_global_extensions*
 			installed, define this variable to a list of extension 
 			names when you can't use |coc#add_extension()|
 
+g:coc_cygqwin_path_prefixes 			*g:coc_cygqwin_path_prefixes*
+
+			When running under cygwin, the node process will work
+			with win32 paths, while your vim process will work
+			with POSIX paths. You can use this map to map between
+			paths. For example, your root folder might be
+			`c:/Users/myUser/workspace` mapped in cygwin as
+			`/home/myUser/workspace`. In this situation, your node
+			process might send the `c:/Users/myUser/workspace`
+			path to your vim process. To solve this, you need to
+			define this map:
+
+				`let g:coc_cygqwin_path_prefixes = `
+				`	\{'c:/Users/myUser': '/home/myUser'}`
+
 g:coc_enable_locationlist 			*g:coc_enable_locationlist*
 
 			Open location list when location list changes.
@@ -997,6 +1012,11 @@ g:node_client_debug 				*g:node_client_debug*
 			:call coc#client#open_log()
 <
 			to open the log file.
+
+g:coc_cursors_activated				*g:coc_cursors_activated*
+
+			Use expression `get(g:, 'coc_cursors_activated',0)` to
+			check if cursors session is activated.
 
 ------------------------------------------------------------------------------
 
@@ -1253,6 +1273,17 @@ CocActionAsync({action}, [...{args}, [{callback}]])
 
 	Call CocAction without blocking vim UI, the callback is called with 
 	`error` as the first argument and `response` as the second argument.
+
+						*CocHasProvider()*
+CocHasProvider({feature})
+
+	Check if provider exists for specified feature. Supported features:
+
+	`rename` `onTypeEdit` `documentLink` `documentColor` `foldingRange`
+	`format` `codeAction` `workspaceSymbols` `formatRange` `hover`
+	`signature` `documentSymbol` `documentHighlight` `definition`
+	`declaration` `typeDefinition` `reference` `implementation` `codeLens`
+	`selectionRange`
 
 ------------------------------------------------------------------------------
 
@@ -1534,7 +1565,7 @@ COMMANDS 					*coc-commands*
 
 :CocConfig 					*:CocConfig*
 
-		Edit the user config file `coc-setting.json`
+		Edit the user config file `coc-settings.json`
 
 :CocInstall [{option}] {name} ... 		*:CocInstall*
 
@@ -2013,6 +2044,7 @@ Default mappings in insert mode:
 <C-n>       - navigate to next input in history.
 <C-p>       - navigate to previous input in history.
 <C-s>       - switch matcher for filter items.
+<C-r>       - insert content from vim register.
 <Tab>       - select action.
 
 Default mappings in normal mode:
@@ -2084,6 +2116,7 @@ The mapping expression should be `command:arguments`, available commands:
 	'deletebackward' - remove next character.
 	'removetail' - remove characters afterwards.
 	'removeahead' - remove character ahead.
+	'insertregister' - insert content from vim register.
 	'paste' - append text from system clipboard to prompt.
 'eval' - append text to prompt from result of viml expression.
 'action' - execute action of list, use <tab> to find available actions.
@@ -2144,6 +2177,8 @@ extensions 						 *coc-list-extensions*
 	- 'toggle' activate/deactivate extension, default action.
 	- 'disable' disable extension.
 	- 'enable' enable extension.
+	- 'lock' lock/unlock extension to current version.
+	- 'doc' view extension's README doc.
 	- 'reload' reload extension.
 	- 'uninstall' uninstall extension.
 
@@ -2346,7 +2381,7 @@ Q: 	I want codeLens feature of LSP.
 A: 	CodeLens support uses the virtual text feature of neovim, its's not 
 	enabled by default. To enable it, add: >
 
-	  "coc.preferences.codeLens.enable": true,
+	  "codeLens.enable": true,
 <
 	to your coc-settings.json
 
