@@ -66,7 +66,7 @@ export default class Floating {
         win.setVar('popup', 1, true)
         nvim.command(`noa call win_gotoid(${win.id})`, true)
         nvim.command(`setl nospell nolist wrap linebreak foldcolumn=1`, true)
-        nvim.command(`setl nonumber norelativenumber nocursorline nocursorcolumn`, true)
+        nvim.command(`setl nonumber norelativenumber nocursorline nocursorcolumn colorcolumn=`, true)
         nvim.command(`setl signcolumn=no conceallevel=2 concealcursor=n`, true)
         nvim.command(`setl winhl=Normal:CocFloating,NormalNC:CocFloating,FoldColumn:CocFloating`, true)
         nvim.call('coc#util#do_autocmd', ['CocOpenFloat'], true)
@@ -194,23 +194,7 @@ export default class Floating {
     }
     let { window } = this
     if (!window) return
+    this.window.close(true, true)
     this.window = null
-    workspace.nvim.call('coc#util#close_win', window.id, true)
-    this.window = null
-    let count = 0
-    let interval = setInterval(() => {
-      count++
-      if (count == 5) clearInterval(interval)
-      window.valid.then(valid => {
-        if (valid) {
-          workspace.nvim.call('coc#util#close_win', window.id, true)
-        } else {
-          window = null
-          clearInterval(interval)
-        }
-      }, _e => {
-        clearInterval(interval)
-      })
-    }, 200)
   }
 }

@@ -57,6 +57,7 @@ export class Workspace implements IWorkspace {
   private _initialized = false
   private _attached = false
   private buffers: Map<number, Document> = new Map()
+  private autocmdMaxId = 0
   private autocmds: Map<number, Autocmd> = new Map()
   private terminals: Map<number, Terminal> = new Map()
   private creatingSources: Map<number, CancellationTokenSource> = new Map()
@@ -141,7 +142,7 @@ export class Workspace implements IWorkspace {
       Object.assign(this._env, { columns, lines })
     }, null, this.disposables)
     await this.attach()
-    this.initVimEvents()
+    this.attachChangedEvents()
     this.configurations.onDidChange(e => {
       this._onDidChangeConfiguration.fire(e)
     }, null, this.disposables)
@@ -195,7 +196,8 @@ export class Workspace implements IWorkspace {
    * Register autocmd on vim.
    */
   public registerAutocmd(autocmd: Autocmd): Disposable {
-    let id = this.autocmds.size + 1
+    this.autocmdMaxId += 1
+    let id = this.autocmdMaxId
     this.autocmds.set(id, autocmd)
     this.setupDynamicAutocmd()
     return Disposable.create(() => {
@@ -608,7 +610,7 @@ export class Workspace implements IWorkspace {
    */
   public async showLocations(locations: Location[]): Promise<void> {
     let items = await Promise.all(locations.map(loc => {
-      return this.getQuickfixItem(loc, '', undefined, 'Locations')
+      return this.getQuickfixItem(loc)
     }))
     let { nvim } = this
     const preferences = this.getConfiguration('coc.preferences')
@@ -1096,8 +1098,8 @@ export class Workspace implements IWorkspace {
       if (m == 'i') {
         nvim.command(`inoremap ${silent}<expr> <Plug>(coc-${key}) coc#_insert_key('${method}', '${key}', ${opts.cancel ? 1 : 0})`, true)
       } else {
-        let modify = this.isNvim ? '<Cmd>' : getKeymapModifier(m)
-        nvim.command(`${m}noremap ${silent} <Plug>(coc-${key}) ${modify}:call coc#rpc#${method}('doKeymap', ['${key}'])<cr>`, true)
+        let modify = getKeymapModifier(m)
+        nvim.command(`${m}noremap ${silent} <Plug>(coc-${key}) ${modify}:<c-u>call coc#rpc#${method}('doKeymap', ['${key}'])<cr>`, true)
       }
     }
     return Disposable.create(() => {
@@ -1130,7 +1132,7 @@ export class Workspace implements IWorkspace {
     let id = uuid()
     let { nvim } = this
     this.keymaps.set(id, [fn, false])
-    nvim.command(`${mode}noremap <silent><nowait><buffer> ${key} :call coc#rpc#${notify ? 'notify' : 'request'}('doKeymap', ['${id}'])<CR>`, true)
+    nvim.command(`${mode}noremap <silent><nowait><buffer> ${key} :<c-u>call coc#rpc#${notify ? 'notify' : 'request'}('doKeymap', ['${id}'])<CR>`, true)
     return Disposable.create(() => {
       this.keymaps.delete(id)
       nvim.command(`${mode}unmap <buffer> ${key}`, true)
@@ -1202,7 +1204,7 @@ export class Workspace implements IWorkspace {
     }
     for (let [id, autocmd] of this.autocmds.entries()) {
       let args = autocmd.arglist && autocmd.arglist.length ? ', ' + autocmd.arglist.join(', ') : ''
-      let event = Array.isArray(autocmd.event) ? autocmd.event.join(' ') : autocmd.event
+      let event = Array.isArray(autocmd.event) ? autocmd.event.join(',') : autocmd.event
       let pattern = '*'
       if (/\buser\b/i.test(event)) {
         pattern = ''
@@ -1305,7 +1307,7 @@ augroup end`
   }
 
   private createConfigurations(): Configurations {
-    let home = process.env.VIMCONFIG || path.join(os.homedir(), '.vim')
+    let home = process.env.COC_VIMCONFIG || path.join(os.homedir(), '.vim')
     if (global.hasOwnProperty('__TEST__')) {
       home = path.join(this.pluginRoot, 'src/__tests__')
     }
@@ -1314,14 +1316,15 @@ augroup end`
   }
 
   // events for sync buffer of vim
-  private initVimEvents(): void {
-    if (!this.isVim) return
-    const onChange = async (bufnr: number) => {
-      let doc = this.getDocument(bufnr)
-      if (doc && doc.shouldAttach) doc.fetchContent()
+  private attachChangedEvents(): void {
+    if (this.isVim) {
+      const onChange = async (bufnr: number) => {
+        let doc = this.getDocument(bufnr)
+        if (doc && doc.shouldAttach) doc.fetchContent()
+      }
+      events.on('TextChangedI', onChange, null, this.disposables)
+      events.on('TextChanged', onChange, null, this.disposables)
     }
-    events.on('TextChangedI', onChange, null, this.disposables)
-    events.on('TextChanged', onChange, null, this.disposables)
   }
 
   private async onBufCreate(buf: number | Buffer): Promise<void> {
@@ -1330,7 +1333,7 @@ augroup end`
     if (this.creatingSources.has(bufnr)) return
     let document = this.getDocument(bufnr)
     try {
-      if (document) this.onBufUnload(bufnr, true)
+      if (document) this.onBufUnload(bufnr, true).logError()
       document = new Document(buffer, this._env)
       let source = new CancellationTokenSource()
       let token = source.token
@@ -1348,7 +1351,7 @@ augroup end`
     this.buffers.set(bufnr, document)
     document.onDocumentDetach(uri => {
       let doc = this.getDocument(uri)
-      if (doc) this.onBufUnload(doc.bufnr)
+      if (doc) this.onBufUnload(doc.bufnr).logError()
     })
     if (document.buftype == '' && document.schema == 'file') {
       let config = this.getConfiguration('workspace')
@@ -1390,7 +1393,8 @@ augroup end`
     this._onDidSaveDocument.fire(doc.textDocument)
   }
 
-  private onBufUnload(bufnr: number, recreate = false): void {
+  private async onBufUnload(bufnr: number, recreate = false): Promise<void> {
+    logger.debug('buffer unload', bufnr)
     if (!recreate) {
       let source = this.creatingSources.get(bufnr)
       if (source) {
@@ -1409,7 +1413,7 @@ augroup end`
       this.buffers.delete(bufnr)
       if (!recreate) doc.detach()
     }
-    logger.debug('buffer unload', bufnr)
+    await wait(10)
   }
 
   private async onBufWritePre(bufnr: number): Promise<void> {
@@ -1502,8 +1506,13 @@ augroup end`
     let filepath = isParentFolder(cwd, newPath) ? path.relative(cwd, newPath) : newPath
     let cursor = await nvim.call('getcurpos')
     nvim.pauseNotification()
-    nvim.command(`keepalt ${bufnr}bwipeout!`, true)
-    nvim.call('coc#util#open_file', ['keepalt edit', filepath], true)
+    if (oldPath.toLowerCase() == newPath.toLowerCase()) {
+      nvim.command(`keepalt ${bufnr}bwipeout!`, true)
+      nvim.call('coc#util#open_file', ['keepalt edit', filepath], true)
+    } else {
+      nvim.call('coc#util#open_file', ['keepalt edit', filepath], true)
+      nvim.command(`${bufnr}bwipeout!`, true)
+    }
     if (!exists && lines.join('\n') != '\n') {
       nvim.call('append', [0, lines], true)
       nvim.command('normal! Gdd', true)

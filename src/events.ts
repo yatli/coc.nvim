@@ -12,6 +12,8 @@ export type BufEvents = 'TextChangedI' | 'BufHidden' | 'BufEnter' | 'TextChanged
 
 export type EmptyEvents = 'FocusGained'
 
+export type TextChangedEvent = 'TextChanged'
+
 export type TaskEvents = 'TaskExit' | 'TaskStderr' | 'TaskStdout'
 
 export type AllEvents = BufEvents | EmptyEvents | MoveEvents | TaskEvents |
@@ -34,6 +36,7 @@ class Events {
 
   private handlers: Map<string, Function[]> = new Map()
   private _cursor: CursorPosition
+  private insertMode = false
 
   public get cursor(): CursorPosition {
     return this._cursor
@@ -42,6 +45,17 @@ class Events {
   public async fire(event: string, args: any[]): Promise<void> {
     logger.debug('Event:', event, args)
     let handlers = this.handlers.get(event)
+    if (event == 'InsertEnter') {
+      this.insertMode = true
+    } else if (event == 'InsertLeave') {
+      this.insertMode = false
+    } else if (!this.insertMode && (event == 'CursorHoldI' || event == 'CursorMovedI')) {
+      this.insertMode = true
+      await this.fire('InsertEnter', [args[0]])
+    } else if (this.insertMode && (event == 'CursorHold' || event == 'CursorMoved')) {
+      this.insertMode = false
+      await this.fire('InsertLeave', [args[0]])
+    }
     if (event == 'CursorMoved' || event == 'CursorMovedI') {
       this._cursor = {
         bufnr: args[0],
@@ -65,6 +79,7 @@ class Events {
   public on(event: EmptyEvents | AllEvents[], handler: () => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: BufEvents, handler: (bufnr: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: MoveEvents, handler: (bufnr: number, cursor: [number, number]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
+  public on(event: TextChangedEvent, handler: (bufnr: number, changedtick: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'TaskExit', handler: (id: string, code: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'TaskStderr' | 'TaskStdout', handler: (id: string, lines: string[]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'BufReadCmd', handler: (scheme: string, fullpath: string) => Result, thisArg?: any, disposables?: Disposable[]): Disposable

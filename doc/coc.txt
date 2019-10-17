@@ -751,11 +751,11 @@ normal mode, `v_` works for visual mode.
 			Try to run quickfix action for diagnostics on the
 			current line.
 
-<Plug>(coc-float-hide) 				*n_coc-flost-hide*
+<Plug>(coc-float-hide) 				*n_coc-float-hide*
 
 			Hide all float windows.
 
-<Plug>(coc-float-jump) 				*n_coc-flost-jump*
+<Plug>(coc-float-jump) 				*n_coc-float-jump*
 
 			Jump to first float window.
 
@@ -943,6 +943,8 @@ g:coc_node_path 				*g:coc_node_path*
 <
 			Use this when coc has problems with your system node,
 
+			Note: you have to use `$HOME` as home directory.
+
 g:coc_force_debug  				*g:coc_force_debug*
 
 			Coc would use the precompiled bundle when the bundle
@@ -1018,6 +1020,11 @@ g:coc_cursors_activated				*g:coc_cursors_activated*
 			Use expression `get(g:, 'coc_cursors_activated',0)` to
 			check if cursors session is activated.
 
+g:coc_config_home				*g:coc_config_home*
+
+			Configure the directory which will be used to look
+			for coc-settings.json and install extensions.
+			
 ------------------------------------------------------------------------------
 
 Some variables are provided by coc.nvim so you can use them in your 
@@ -1553,7 +1560,7 @@ COMMANDS 					*coc-commands*
 
 		Restart coc service.
 
-		Use this command when you want coc start all over again.
+		Use this command when you want coc to start all over again.
 
 :CocDisable 					*:CocDisable*
 
@@ -1566,6 +1573,11 @@ COMMANDS 					*coc-commands*
 :CocConfig 					*:CocConfig*
 
 		Edit the user config file `coc-settings.json`
+
+:CocLocalConfig 				*:CocLocalConfig*
+
+		Edit or create `.vim/coc-settings.json` of the current working
+		directory.
 
 :CocInstall [{option}] {name} ... 		*:CocInstall*
 
@@ -1658,7 +1670,7 @@ AUTOCMD 					*coc-autocmds*
 						*CocNvimInit*
 :autocmd User CocNvimInit {command}
 
-		Triggered after the coc services has started.
+		Triggered after the coc services have started.
 
 		If you want to trigger an action of coc after vim has started, 
 		this autocmd should be used because coc is always started 
@@ -1684,7 +1696,7 @@ AUTOCMD 					*coc-autocmds*
 :autocmd User CocJumpPlaceholder {command}
 
 		Triggered after a jump to a placeholder. Can be used for 
-		showwing signature help like so: >
+		showing signature help like so: >
 
 	autocmd User CocJumpPlaceholder call CocActionAsync('showSignatureHelp')
 <
@@ -1692,13 +1704,13 @@ AUTOCMD 					*coc-autocmds*
 
 :autocmd User CocOpenFloat {command}
 
-		Triggered when floating window opened.
+		Triggered when a floating window is opened.
 						*CocTerminalOpen*
 
 :autocmd User CocTerminalOpen {command}
 
-		Triggered when terminal shown, can be used for adjust window
-		height.
+		Triggered when the terminal is shown, can be used for adjusting the
+		window height.
 
 ------------------------------------------------------------------------------
 
@@ -1849,7 +1861,7 @@ CocErrorFloat 					*CocErrorFloat*
 
   The highlight used for a floating window with errors.
 
-CocWarningFloat 					*CocWarningFloat*
+CocWarningFloat 				*CocWarningFloat*
 
   Default: `hi default link CocWarningFloat CocWarningSign`
 
@@ -1872,6 +1884,12 @@ CocCursorRange 					*CocCursorRange*
   Default: `hi default link CocCursorRange Search`
 
   The highlight used for cursor ranges.
+
+CocHoverRange 					*CocHoverRange*
+
+  Default: `hi default link CocHoverRange Search`
+
+  The highlight used for current hover range.
 
 ==============================================================================
 LIST SUPPORT 					*coc-list*

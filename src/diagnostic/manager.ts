@@ -28,8 +28,10 @@ export interface DiagnosticConfig {
   hintSign: string
   level: number
   messageTarget: string
+  messageDelay: number
   joinMessageLines: boolean
   maxWindowHeight: number
+  maxWindowWidth: number
   refreshAfterSave: boolean
   refreshOnInsertMode: boolean
   virtualTextSrcId: number
@@ -53,8 +55,8 @@ export class DiagnosticManager implements Disposable {
   public init(): void {
     this.setConfiguration()
     let { nvim } = workspace
-    let { maxWindowHeight } = this.config
-    this.floatFactory = new FloatFactory(nvim, workspace.env, false, maxWindowHeight)
+    let { maxWindowHeight, maxWindowWidth } = this.config
+    this.floatFactory = new FloatFactory(nvim, workspace.env, false, maxWindowHeight, maxWindowWidth)
     this.disposables.push(Disposable.create(() => {
       if (this.timer) clearTimeout(this.timer)
     }))
@@ -63,7 +65,7 @@ export class DiagnosticManager implements Disposable {
       this.timer = setTimeout(async () => {
         if (this.config.enableMessage != 'always') return
         await this.echoMessage(true)
-      }, 500)
+      }, this.config.messageDelay)
     }, null, this.disposables)
     events.on('InsertEnter', async () => {
       if (this.timer) clearTimeout(this.timer)
@@ -126,19 +128,10 @@ export class DiagnosticManager implements Disposable {
       let doc = workspace.getDocument(textDocument.uri)
       this.createDiagnosticBuffer(doc)
     }, null, this.disposables)
-    workspace.onDidCloseTextDocument(async ({ uri }) => {
+    workspace.onDidCloseTextDocument(({ uri }) => {
       let doc = workspace.getDocument(uri)
       if (!doc) return
-      let { bufnr } = doc
-      let idx = this.buffers.findIndex(buf => buf.bufnr == bufnr)
-      if (idx == -1) return
-      let buf = this.buffers[idx]
-      buf.dispose()
-      this.buffers.splice(idx, 1)
-      for (let collection of this.collections) {
-        collection.delete(buf.uri)
-      }
-      await buf.clear()
+      this.disposeBuffer(doc.bufnr)
     }, null, this.disposables)
     this.setConfigurationErrors(true)
     workspace.configurations.onError(async () => {
@@ -460,6 +453,18 @@ export class DiagnosticManager implements Disposable {
     }
   }
 
+  private disposeBuffer(bufnr: number): void {
+    let idx = this.buffers.findIndex(buf => buf.bufnr == bufnr)
+    if (idx == -1) return
+    let buf = this.buffers[idx]
+    buf.dispose()
+    this.buffers.splice(idx, 1)
+    for (let collection of this.collections) {
+      collection.delete(buf.uri)
+    }
+    buf.clear().logError()
+  }
+
   public hideFloat(): void {
     if (this.floatFactory) {
       this.floatFactory.close()
@@ -500,8 +505,10 @@ export class DiagnosticManager implements Disposable {
       checkCurrentLine: getConfig<boolean>('checkCurrentLine', false),
       enableSign: getConfig<boolean>('enableSign', true),
       maxWindowHeight: getConfig<number>('maxWindowHeight', 10),
+      maxWindowWidth: getConfig<number>('maxWindowWidth', 80),
       enableMessage: getConfig<string>('enableMessage', 'always'),
       joinMessageLines: getConfig<boolean>('joinMessageLines', false),
+      messageDelay: getConfig<number>('messageDelay', 250),
       virtualText: getConfig<boolean>('virtualText', false),
       virtualTextPrefix: getConfig<string>('virtualTextPrefix', " "),
       virtualTextLineSeparator: getConfig<string>('virtualTextLineSeparator', " \\ "),
@@ -544,12 +551,12 @@ export class DiagnosticManager implements Disposable {
 
   private refreshBuffer(uri: string): boolean {
     let { insertMode } = workspace
+    if (insertMode && !this.config.refreshOnInsertMode) return
     let buf = this.buffers.find(buf => buf.uri == uri)
     if (!buf) return
     let { displayByAle } = this.config
     if (!displayByAle) {
       let diagnostics = this.getDiagnostics(uri)
-      if (insertMode && !this.config.refreshOnInsertMode && diagnostics.length != 0) return
       if (this.enabled) {
         buf.refresh(diagnostics)
         return true
@@ -559,6 +566,10 @@ export class DiagnosticManager implements Disposable {
       nvim.pauseNotification()
       for (let collection of this.collections) {
         let diagnostics = collection.get(uri)
+        const { level } = this.config
+        if (level) {
+          diagnostics = diagnostics.filter(o => o.severity && o.severity <= level)
+        }
         let aleItems = diagnostics.map(o => {
           let { range } = o
           return {

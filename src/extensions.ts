@@ -1,5 +1,6 @@
 import { debounce } from 'debounce'
 import fastDiff from 'fast-diff'
+import os from 'os'
 import fs from 'fs'
 import isuri from 'isuri'
 import path from 'path'
@@ -246,6 +247,9 @@ export class Extensions {
 
   private get npm(): string {
     let npm = workspace.getConfiguration('npm').get<string>('binPath', 'npm')
+    if (npm.startsWith('~')) {
+      npm = os.homedir() + npm.slice(1)
+    }
     for (let exe of [npm, 'yarnpkg', 'yarn', 'npm']) {
       try {
         let res = which.sync(exe)
@@ -455,8 +459,8 @@ export class Extensions {
   }
 
   private async loadFileExtensions(): Promise<void> {
-    if (!process.env.VIMCONFIG) return
-    let folder = path.join(process.env.VIMCONFIG, 'coc-extensions')
+    if (!process.env.COC_VIMCONFIG) return
+    let folder = path.join(process.env.COC_VIMCONFIG, 'coc-extensions')
     if (!fs.existsSync(folder)) return
     let files = await readdirAsync(folder)
     files = files.filter(f => f.endsWith('.js'))

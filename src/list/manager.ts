@@ -176,6 +176,9 @@ export class ListManager implements Disposable {
     this.window = await nvim.window
     this.prompt.start()
     await ui.resume(name, this.listOptions)
+    if (this.listOptions.autoPreview) {
+      await this.doAction('preview')
+    }
   }
 
   public async doAction(name?: string): Promise<void> {
@@ -186,7 +189,13 @@ export class ListManager implements Disposable {
       workspace.showMessage(`Action ${name} not found`, 'error')
       return
     }
-    let items = await this.ui.getItems()
+    let items: ListItem[]
+    if (name == 'preview') {
+      let item = await this.ui.item
+      items = item ? [item] : []
+    } else {
+      items = await this.ui.getItems()
+    }
     if (items.length) await this.doItemAction(items, action)
   }
 
@@ -571,7 +580,7 @@ export class ListManager implements Disposable {
     highligher.addLine('ACTIONS', 'Label')
     highligher.addLine(`  ${list.actions.map(o => o.name).join(', ')}`)
     highligher.addLine('')
-    highligher.addLine(`see ':h coc-list--options' for available list options.`, 'Comment')
+    highligher.addLine(`see ':h coc-list-options' for available list options.`, 'Comment')
     nvim.pauseNotification()
     highligher.render(buf, 0, -1)
     nvim.command('setl nomod', true)

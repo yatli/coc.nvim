@@ -25,7 +25,7 @@ It's a completion framework and language server client which supports [extension
 
 _True snippet and additional text editing support_
 
-Floating windows require nightly build of neovim or vim >= 8.1.1522, [follow steps in the faq](https://github.com/neoclide/coc.nvim/wiki/F.A.Q#how-to-make-preview-window-shown-aside-with-pum).
+Floating windows require the nightly build of vim >= 8.1.1522, [follow steps in the faq](https://github.com/neoclide/coc.nvim/wiki/F.A.Q#how-to-make-preview-window-shown-aside-with-pum). Floating windows are supported in neovim >= 0.4.0.
 
 Check out [doc/coc.txt](doc/coc.txt) for the vim interface.
 
@@ -146,6 +146,7 @@ Below are the reasons that led coc.nvim to build its own engine:
     - [Fortran](https://github.com/neoclide/coc.nvim/wiki/Language-servers#fortran)
     - [Clojure](https://github.com/neoclide/coc.nvim/wiki/Language-servers#clojure)
     - [Julia](https://github.com/neoclide/coc.nvim/wiki/Language-servers#julia)
+    - [Dhall](https://github.com/neoclide/coc.nvim/wiki/Language-servers#dhall)
 
 * [Statusline integration](https://github.com/neoclide/coc.nvim/wiki/Statusline-integration)
 
@@ -191,6 +192,7 @@ Extensions are more powerful than a configured language server. Check out
   use [solargraph](http://solargraph.org/).
 - **[coc-rls](https://github.com/neoclide/coc-rls)** for `rust`, use
   [Rust Language Server](https://github.com/rust-lang/rls)
+- **[coc-rust-analyzer](https://github.com/fannheyward/coc-rust-analyzer)** for `rust`, use [rust-analyzer](https://github.com/rust-analyzer/rust-analyzer)
 - **[coc-r-lsp](https://github.com/neoclide/coc-r-lsp)** for `r`, use [R languageserver](https://github.com/REditorSupport/languageserver).
 - **[coc-yaml](https://github.com/neoclide/coc-yaml)** for `yaml`
 - **[coc-python](https://github.com/neoclide/coc-python)** for `python`, extension forked from [vscode-python](https://github.com/Microsoft/vscode-python).
@@ -211,12 +213,14 @@ Extensions are more powerful than a configured language server. Check out
 - **[coc-vimlsp](https://github.com/iamcco/coc-vimlsp)** for `viml`.
 - **[coc-xml](https://github.com/fannheyward/coc-xml)** for `xml`, use [lsp4xml](https://github.com/angelozerr/lsp4xml).
 - **[coc-elixir](https://github.com/amiralies/coc-elixir)** for `elixir`, based on [elixir-ls](https://github.com/JakeBecker/elixir-ls/).
+- **[coc-erlang_ls](https://github.com/hyhugh/coc-erlang_ls)** for `erlang`, based on [erlang_ls](https://github.com/erlang-ls/erlang_ls)
 - **[coc-tabnine](https://github.com/neoclide/coc-tabnine)** for [tabnine](https://tabnine.com/).
 - **[coc-powershell](https://github.com/yatli/coc-powershell)** for PowerShellEditorService integration.
 - **[coc-omnisharp](https://github.com/yatli/coc-omnisharp)** for `csharp` and `visualbasic`.
 - **[coc-texlab](https://github.com/fannheyward/coc-texlab)** for `LaTex` using [TexLab](https://texlab.netlify.com/).
 - **[coc-lsp-wl](https://github.com/voldikss/coc-lsp-wl)** for `wolfram mathematica`, fork of [vscode-lsp-wl](https://github.com/kenkangxgwe/vscode-lsp-wl).
 - **[coc-flow](https://github.com/amiralies/coc-flow)** for [`flow`](https://flow.org)
+- **[coc-reason](https://github.com/jaredly/reason-language-server/tree/master/editor-extensions/coc.nvim)** for [`reasonml`](https://reasonml.github.io/)
 
 Plus more! To get a full list of coc extensions, [search coc.nvim on npm](https://www.npmjs.com/search?q=keywords%3Acoc.nvim),
 or use [coc-marketplace](https://github.com/fannheyward/coc-marketplace), which can search and install extensions in coc.nvim directly.
@@ -271,10 +275,12 @@ inoremap <silent><expr> <c-space> coc#refresh()
 " Use <cr> to confirm completion, `<C-g>u` means break undo chain at current position.
 " Coc only does snippet and additional edit on confirm.
 inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
+" Or use `complete_info` if your vim support it, like:
+" inoremap <expr> <cr> complete_info()["selected"] != "-1" ? "\<C-y>" : "\<C-g>u\<CR>"
 
-" Use `[c` and `]c` to navigate diagnostics
-nmap <silent> [c <Plug>(coc-diagnostic-prev)
-nmap <silent> ]c <Plug>(coc-diagnostic-next)
+" Use `[g` and `]g` to navigate diagnostics
+nmap <silent> [g <Plug>(coc-diagnostic-prev)
+nmap <silent> ]g <Plug>(coc-diagnostic-next)
 
 " Remap keys for gotos
 nmap <silent> gd <Plug>(coc-definition)
@@ -320,10 +326,15 @@ nmap <leader>ac  <Plug>(coc-codeaction)
 " Fix autofix problem of current line
 nmap <leader>qf  <Plug>(coc-fix-current)
 
-" Use <tab> for select selections ranges, needs server support, like: coc-tsserver, coc-python
-nmap <silent> <TAB> <Plug>(coc-range-select)
-xmap <silent> <TAB> <Plug>(coc-range-select)
-xmap <silent> <S-TAB> <Plug>(coc-range-select-backword)
+" Create mappings for function text object, requires document symbols feature of languageserver.
+xmap if <Plug>(coc-funcobj-i)
+xmap af <Plug>(coc-funcobj-a)
+omap if <Plug>(coc-funcobj-i)
+omap af <Plug>(coc-funcobj-a)
+
+" Use <C-d> for select selections ranges, needs server support, like: coc-tsserver, coc-python
+nmap <silent> <C-d> <Plug>(coc-range-select)
+xmap <silent> <C-d> <Plug>(coc-range-select)
 
 " Use `:Format` to format current buffer
 command! -nargs=0 Format :call CocAction('format')
@@ -416,6 +427,138 @@ Try these steps when you have problem with coc.nvim.
 </a>
 <a href="https://github.com/darthShadow" target="_blank" title="darthShadow">
   <img src="https://github.com/darthShadow.png?size=64" width="64" height="64" alt="darthShadow">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/gravatar/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/f8fbc5df2432deac7557cf5e111439f2" width="64" height="64" alt="Matt Greer">
+</a>
+<a href="#Backers">
+  <img src="https://avatars0.githubusercontent.com/u/2914269?v=4&s=100&s=400" width="64" height="64" alt="malob">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/gravatar/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/a8b8103b9131cdf694bea446881c05fb" width="64" height="64" alt="Emigre">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals27_bjhsl8.png" width="64" height="64" alt="OkanEsen">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals57_yatmux.png" width="64" height="64" alt="Lennaert Meijvogel">
+</a>
+<a href="#Backers">
+  <img src="https://avatars2.githubusercontent.com/u/557201?s=400&u=ac96c9da87099c27f094eec935a627cb32fdfdf2&v=4&s=400" width="64" height="64" alt="Nils Landt">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals10_mjtuws.png" width="64" height="64" alt="dlants">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals45_ecgl95.png" width="64" height="64" alt="RCVU">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals71_wi5cvo.png" width="64" height="64" alt="yatli">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/gravatar/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/2986e67e29cf2ad3de088f9f8bc131cf" width="64" height="64" alt="mikker">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/gravatar/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/8703a88e1c178112625bcb6970ed40e4" width="64" height="64" alt="Velovix">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals51_byhedz.png" width="64" height="64" alt="stCarolas">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals67_rzqguf.png" width="64" height="64" alt="Robbie Clarken">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/svdunc4lofagkaeobpar.png" width="64" height="64" alt="hallettj">
+</a>
+<a href="#Backers">
+  <img src="https://avatars0.githubusercontent.com/u/6803419?v=4&s=100&s=400" width="64" height="64" alt="appelgriebsch">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals75_a0xqeq.png" width="64" height="64" alt="cosminadrianpopescu">
+</a>
+<a href="#Backers">
+  <img src="https://avatars3.githubusercontent.com/u/301015?v=4&s=100&s=400" width="64" height="64" alt="partizan">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals24_s1h7ax.png" width="64" height="64" alt="ksaldana1">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals63_olgqd6.png" width="64" height="64" alt="jesperryom">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals70_t5kjmo.png" width="64" height="64" alt="JackCA">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals38_vwccce.png" width="64" height="64" alt="peymanmortazavi">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals92_htl0if.png" width="64" height="64" alt="jonaustin">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals33_ch4hs0.png" width="64" height="64" alt="Yuriy Ivanyuk">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals26_knlvug.png" width="64" height="64" alt="abenz1267">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals100_g8py5g.png" width="64" height="64" alt="Sh3Rm4n">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals14_bnuacq.png" width="64" height="64" alt="mwcz">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals78_hleldd.png" width="64" height="64" alt="Philipp-M">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals37_sikg8d.png" width="64" height="64" alt="gvelchuru">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals62_hxul6y.png" width="64" height="64" alt="JSamir">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals19_zafwti.png" width="64" height="64" alt="toby de havilland">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals97_iuw00n.png" width="64" height="64" alt="viniciusarcanjo">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals70_t5kjmo.png" width="64" height="64" alt="Mike Hearn">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals87_vnmrie.png" width="64" height="64" alt="darsto">
+</a>
+<a href="#Backers">
+  <img src="https://avatars2.githubusercontent.com/u/145502?v=4&s=100&s=400" width="64" height="64" alt="pyrho">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals102_hqrga7.png" width="64" height="64" alt="Frydac">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals90_qlafi0.png" width="64" height="64" alt="gsa9">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals16_qlob5k.png" width="64" height="64" alt="_andys8">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals27_bjhsl8.png" width="64" height="64" alt="iago-lito">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals44_xa5xwi.png" width="64" height="64" alt="ddaletski">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals83_ryixly.png" width="64" height="64" alt="jonatan-branting">
+</a>
+<a href="#Backers">
+  <img src="https://avatars3.githubusercontent.com/u/8683947?v=4&s=100&s=400" width="64" height="64" alt="yutakatay">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals87_vnmrie.png" width="64" height="64" alt="kevinrambaud">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals76_g3jfjp.png" width="64" height="64" alt="tomaskallup">
+</a>
+<a href="#Backers">
+  <img src="https://cloudinary-a.akamaihd.net/bountysource/image/upload/d_noaoqqwxegvmulwus0un.png,c_pad,w_400,h_400,b_white/Bountysource_Animals46_qe2ye0.png" width="64" height="64" alt="LewisSteele">
 </a>
 
 ## Feedback

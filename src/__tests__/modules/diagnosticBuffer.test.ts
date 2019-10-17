@@ -11,8 +11,10 @@ const config: DiagnosticConfig = {
   checkCurrentLine: false,
   enableSign: true,
   maxWindowHeight: 8,
+  maxWindowWidth: 80,
   enableMessage: 'always',
   messageTarget: 'echo',
+  messageDelay: 250,
   refreshOnInsertMode: false,
   virtualTextSrcId: 0,
   virtualText: false,
@@ -104,6 +106,7 @@ describe('diagnostic buffer', () => {
     let buffer = await nvim.buffer
     let res = await buffer.getVar('coc_diagnostic_info')
     expect(res).toEqual({
+      lnums: [1, 1, 1, 1],
       information: 1,
       hint: 1,
       warning: 1,
@@ -134,7 +137,7 @@ describe('diagnostic buffer', () => {
     await helper.wait(50)
     let buffer = await nvim.buffer
     let res = await buffer.getVar("coc_diagnostic_info")
-    expect(res).toEqual({ error: 0, hint: 0, information: 0, warning: 0 })
+    expect(res).toEqual({ lnums: [0, 0, 0, 0], error: 0, hint: 0, information: 0, warning: 0 })
     let { matchIds } = buf as any
     expect(matchIds.size).toBe(0)
   })
